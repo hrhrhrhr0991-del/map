@@ -1,0 +1,10 @@
+{
+  "name": "استخراج‌گر هوشمند اطلاعات کسب‌وکار و گوگل مپ | Smart Business & Map Extractor",
+  "description": "سامانه حرفه‌ای و پیشرفته استخراج اطلاعات جامع کسب‌وکارها، شماره‌های تماس، آدرس، وب‌سایت و شبکه‌های اجتماعی از گوگل مپ و سراسر وب با امکان دانلود خروجی اکسل، CSV و مخاطبین",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
