@@ -20,10 +20,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-// The AI Studio architecture runs an Nginx reverse proxy on port 8080 which forwards
-// all traffic to the internal application listening on port 3000.
-// Under no circumstances should this Node app attempt to bind to port 8080.
-const PORT = 3000;
+// In AI Studio development sandbox, Nginx occupies port 8080 and proxies to port 3000.
+// In Cloud Run production deployment, there is no Nginx and the container must listen
+// on Cloud Run's assigned PORT (defaults to 8080).
+const isDevSandbox = Boolean(process.env.CONTROL_PLANE_PORT || process.env.NGINX_PORT);
+const isProduction = process.env.NODE_ENV === 'production' || !isDevSandbox;
+const PORT = isDevSandbox ? 3000 : parseInt(process.env.PORT || '8080', 10);
+
 
 app.use(express.json());
 
@@ -559,13 +562,18 @@ ${multilingualHint}
   }
 });
 
+// Health check endpoints for Cloud Run container liveness checks
+app.get(['/health', '/_health'], (_req, res) => {
+  res.status(200).send('OK');
+});
+
 // Configure Vite middleware in development or static serve in production
 async function setupServer() {
   const distHtmlPath = path.join(__dirname, 'dist', 'index.html');
   const hasDist = fs.existsSync(distHtmlPath);
-  const isProd = process.env.NODE_ENV === 'production' && hasDist;
+  const isProd = isProduction || hasDist;
 
-  if (isProd) {
+  if (isProd && hasDist) {
     app.use(express.static(path.join(__dirname, 'dist')));
     app.get('*', (_req, res) => {
       res.sendFile(distHtmlPath);
@@ -579,8 +587,23 @@ async function setupServer() {
     app.use(vite.middlewares);
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on http://0.0.0.0:${PORT} (sandbox: ${isDevSandbox}, mode: ${isProduction ? 'production' : 'development'})`);
+  });
+
+  server.on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      const fallbackPort = PORT === 8080 ? 3000 : 8080;
+      console.warn(`Port ${PORT} in use (EADDRINUSE). Attempting fallback to port ${fallbackPort}...`);
+      const fallbackServer = app.listen(fallbackPort, '0.0.0.0', () => {
+        console.log(`Server fallback running on http://0.0.0.0:${fallbackPort}`);
+      });
+      fallbackServer.on('error', (fallbackErr: any) => {
+        console.warn('Fallback server notice:', fallbackErr?.message || fallbackErr);
+      });
+    } else {
+      console.error('Server listen error:', err);
+    }
   });
 }
 

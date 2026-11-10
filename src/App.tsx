@@ -92,16 +92,21 @@ export default function App() {
     setCurrentQuery(queryText);
     if (!isAppend) setSelectedIds([]);
 
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+
     try {
       const res = await fetch('/api/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           query: queryText,
           mode,
           count,
         }),
       });
+      clearTimeout(timer);
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
@@ -276,7 +281,7 @@ export default function App() {
           )}
 
           {/* Loading Indicator or Views */}
-          {isLoading ? (
+          {isLoading && leads.length === 0 ? (
             <div className="py-20 text-center flex flex-col items-center justify-center gap-4 bg-slate-900/30 rounded-3xl border border-slate-800/80 mb-8">
               <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shadow-lg shadow-amber-500/10">
                 <RefreshCw className="w-8 h-8 text-amber-400 animate-spin" />
@@ -289,7 +294,16 @@ export default function App() {
               </div>
             </div>
           ) : (
-            <>
+            <div className="relative">
+              {isLoading && (
+                <div className="mb-4 p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 flex items-center justify-between text-xs animate-pulse">
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="w-4 h-4 animate-spin text-amber-400" />
+                    <span className="font-semibold">در حال استخراج سریع اطلاعات جدید برای «{currentQuery}»...</span>
+                  </div>
+                  <span className="text-[11px] text-slate-400">اطلاعات در کسری از ثانیه اضافه می‌شود</span>
+                </div>
+              )}
               {/* Views: Cards / Table / Map */}
               {activeView === 'cards' && (
                 <BusinessCards
@@ -332,7 +346,7 @@ export default function App() {
                   </p>
                 </div>
               )}
-            </>
+            </div>
           )}
         </div>
       </main>
